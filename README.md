@@ -6,7 +6,7 @@ Hourly dispatcher for GCP function triggering
 gcloud functions deploy logistics-manager-sync \
   --gen2 \
   --runtime=python311 \
-  --region=us-central1 \
+  --region=us-east1 \
   --source=. \
   --entry-point=entrypoint \
   --trigger-topic=gcp-hourly \
