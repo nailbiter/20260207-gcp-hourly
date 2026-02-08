@@ -2,5 +2,6 @@ functions-framework==3.*
 pymongo[srv]==4.6.*
 croniter==2.0.*
 requests==2.31.*
+google-cloud-pubsub
 
 git+https://github.com/nailbiter/alex_leontiev_toolbox_python@main-stable

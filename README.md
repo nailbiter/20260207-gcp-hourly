@@ -11,5 +11,6 @@ gcloud functions deploy logistics-manager-sync \
   --entry-point=entrypoint \
   --trigger-topic=gcp-hourly \
   --set-secrets="MONGO_URI=mongo-url-gaq:latest" \
-  --timeout=300
+  --set-env-vars=GCLOUD_PROJECT=$GCLOUD_PROJECT \
+  --timeout=300 --memory=512Mi
 ```

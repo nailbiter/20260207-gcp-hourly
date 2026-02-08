@@ -1,10 +1,11 @@
 import os
 import datetime
+
 import requests
 import functions_framework
 from pymongo import MongoClient
 from croniter import croniter
-
+from google.cloud import pubsub_v1
 from alex_leontiev_toolbox_python.utils.logging_helpers import get_configured_logger
 
 from common.call_cloud_run import call_cloud_run
@@ -13,11 +14,33 @@ from common.call_cloud_run import call_cloud_run
 MONGO_URI = os.environ.get("MONGO_URI")
 DB_NAME = "logistics"
 COLLECTION_NAME = "20260207-hourly-execution"
+PROJECT_ID = os.environ.get("GCLOUD_PROJECT")
 
 logger = get_configured_logger(
     "main",
     log_format="%(asctime)s - %(name)s - %(levelname)s - Line:%(lineno)d - %(message)s",
 )
+
+
+def publish_message(project_id, topic_id, message_data) -> None:
+    """
+    # Initialize the Publisher Client
+    # Usage
+    # publish_message("your-project-id", "your-topic-id", "Hello World!")
+    """
+    publisher = pubsub_v1.PublisherClient()
+
+    # Create a fully qualified topic path
+    topic_path = publisher.topic_path(project_id, topic_id)
+
+    # Data must be a bytestring
+    data = message_data.encode("utf-8")
+
+    # Publish the message
+    future = publisher.publish(topic_path, data)
+
+    # Resolve the future to ensure the message was sent
+    print(f"Published message ID: {future.result()}")
 
 
 @functions_framework.cloud_event
@@ -61,7 +84,11 @@ def entrypoint(cloud_event):
                     # Sync POST request to the Cloud Run service
                     # response = requests.post(url, timeout=30)
                     # response.raise_for_status()
-                    call_cloud_run(url, text=text)
+                    if url.startswith("pubsub:"):
+                        publish_message(PROJECT_ID, url.removeprefix("pubsub:"), text)
+                    else:
+                        call_cloud_run(url, text=text)
+
                     triggered_count += 1
                 except Exception as req_err:
                     logger.info(f"Failed to trigger {url}: {req_err}")
