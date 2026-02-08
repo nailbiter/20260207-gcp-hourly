@@ -26,6 +26,7 @@ def entrypoint(cloud_event):
     Triggered by a Pub/Sub message via Cloud Scheduler.
     """
     client = MongoClient(MONGO_URI)
+    logger.debug(dict(cloud_event=cloud_event))
     try:
         db = client[DB_NAME]
         collection = db[COLLECTION_NAME]
