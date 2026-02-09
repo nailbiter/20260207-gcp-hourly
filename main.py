@@ -15,6 +15,7 @@ MONGO_URI = os.environ.get("MONGO_URI")
 DB_NAME = "logistics"
 COLLECTION_NAME = "20260207-hourly-execution"
 PROJECT_ID = os.environ.get("GCLOUD_PROJECT")
+CALL_ON_ERROR = os.environ.get("CALL_ON_ERROR")
 
 logger = get_configured_logger(
     "main",
@@ -71,6 +72,7 @@ def entrypoint(cloud_event):
             cron = doc.get("cronline")
             is_active = doc.get("is_active", True)
             text = doc.get("text")
+            name = doc.get("name", "NONAME")
 
             logger.debug(dict(url=url, cros=cron, is_active=is_active, text=text))
 
@@ -80,18 +82,39 @@ def entrypoint(cloud_event):
             # 3. Match cronline against our truncated hour
             if croniter.match(cron, now):
                 logger.info(f"Match! Cron '{cron}' triggers URL: {url}")
+                is_triggered = False
+
+                res = None
                 try:
                     # Sync POST request to the Cloud Run service
                     # response = requests.post(url, timeout=30)
                     # response.raise_for_status()
                     if url.startswith("pubsub:"):
                         publish_message(PROJECT_ID, url.removeprefix("pubsub:"), text)
+                        res = {"status": "success"}
                     else:
-                        call_cloud_run(url, text=text)
+                        res = call_cloud_run(url, text=text)
 
+                    is_triggered = True
                     triggered_count += 1
                 except Exception as req_err:
-                    logger.info(f"Failed to trigger {url}: {req_err}")
+                    logger.error(f"Failed to trigger {url}: {req_err}")
+                    res = (
+                        {"status": "failure", "reason": str(req_err)}
+                        if res is None
+                        else res
+                    )
+
+                if ((not is_triggered) or (res["status"] != "success")) and (
+                    CALL_ON_ERROR is not None
+                ):
+                    try:
+                        call_cloud_run(
+                            CALL_ON_ERROR,
+                            text=f"""error in calling `{name}`, reason: {res.get('reason')}""",
+                        )
+                    except Exception as e:
+                        logger.error(e)
 
         logger.info(f"Execution finished. Total triggered: {triggered_count}")
 
